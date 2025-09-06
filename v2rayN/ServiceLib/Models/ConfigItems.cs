@@ -142,6 +142,7 @@ public class CoreTypeItem
 public class TunModeItem
 {
     public bool EnableTun { get; set; }
+    public bool AutoRoute { get; set; } = true;
     public bool StrictRoute { get; set; } = true;
     public string Stack { get; set; }
     public int Mtu { get; set; }
@@ -164,7 +165,6 @@ public class RoutingBasicItem
 {
     public string DomainStrategy { get; set; }
     public string DomainStrategy4Singbox { get; set; }
-    public string DomainMatcher { get; set; }
     public string RoutingIndexId { get; set; }
 }
 

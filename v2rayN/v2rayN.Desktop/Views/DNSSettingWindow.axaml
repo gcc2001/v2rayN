@@ -24,14 +24,12 @@
                 x:Name="btnSave"
                 Width="100"
                 Content="{x:Static resx:ResUI.TbConfirm}"
-                Cursor="Hand"
                 IsDefault="True" />
             <Button
                 x:Name="btnCancel"
                 Width="100"
                 Margin="{StaticResource MarginLr8}"
                 Content="{x:Static resx:ResUI.TbCancel}"
-                Cursor="Hand"
                 IsCancel="True" />
         </StackPanel>
 
@@ -61,7 +59,7 @@
                             x:Name="cmbDirectDNS"
                             Grid.Row="1"
                             Grid.Column="1"
-                            Width="200"
+                            Width="300"
                             Margin="{StaticResource Margin4}"
                             Text="{Binding DirectDNS, Mode=TwoWay}" />
 
@@ -75,7 +73,7 @@
                             x:Name="cmbRemoteDNS"
                             Grid.Row="2"
                             Grid.Column="1"
-                            Width="200"
+                            Width="300"
                             Margin="{StaticResource Margin4}"
                             Text="{Binding RemoteDNS, Mode=TwoWay}" />
 
@@ -89,7 +87,7 @@
                             x:Name="cmbSBResolverDNS"
                             Grid.Row="3"
                             Grid.Column="1"
-                            Width="200"
+                            Width="300"
                             Margin="{StaticResource Margin4}"
                             Text="{Binding SingboxOutboundsResolveDNS, Mode=TwoWay}" />
                         <TextBlock
@@ -97,7 +95,8 @@
                             Grid.Column="2"
                             Margin="{StaticResource Margin4}"
                             VerticalAlignment="Center"
-                            Text="{x:Static resx:ResUI.TbSBOutboundDomainResolve}" />
+                            Text="{x:Static resx:ResUI.TbSBOutboundDomainResolve}"
+                            TextWrapping="Wrap" />
 
                         <TextBlock
                             Grid.Row="4"
@@ -109,7 +108,7 @@
                             x:Name="cmbSBFinalResolverDNS"
                             Grid.Row="4"
                             Grid.Column="1"
-                            Width="200"
+                            Width="300"
                             Margin="{StaticResource Margin4}"
                             Text="{Binding SingboxFinalResolveDNS, Mode=TwoWay}" />
                         <TextBlock
@@ -117,7 +116,8 @@
                             Grid.Column="2"
                             Margin="{StaticResource Margin4}"
                             VerticalAlignment="Center"
-                            Text="{x:Static resx:ResUI.TbSBFallbackDNSResolve}" />
+                            Text="{x:Static resx:ResUI.TbSBFallbackDNSResolve}"
+                            TextWrapping="Wrap" />
 
                         <TextBlock
                             Grid.Row="5"
@@ -178,7 +178,8 @@
                             Grid.Column="2"
                             Margin="{StaticResource Margin4}"
                             VerticalAlignment="Center"
-                            Text="{x:Static resx:ResUI.TbSBDoHOverride}" />
+                            Text="{x:Static resx:ResUI.TbSBDoHOverride}"
+                            TextWrapping="Wrap" />
                     </Grid>
                 </ScrollViewer>
             </TabItem>
@@ -228,7 +229,8 @@
                             Grid.Column="2"
                             Margin="{StaticResource Margin4}"
                             VerticalAlignment="Center"
-                            Text="{x:Static resx:ResUI.TbApplyProxyDomainsOnly}" />
+                            Text="{x:Static resx:ResUI.TbApplyProxyDomainsOnly}"
+                            TextWrapping="Wrap" />
 
                         <TextBlock
                             Grid.Row="3"
@@ -247,7 +249,8 @@
                             Grid.Column="2"
                             Margin="{StaticResource Margin4}"
                             VerticalAlignment="Center"
-                            Text="{x:Static resx:ResUI.TbPreventDNSLeaks}" />
+                            Text="{x:Static resx:ResUI.TbBlockSVCBHTTPSQueriesTips}"
+                            TextWrapping="Wrap" />
 
                         <TextBlock
                             Grid.Row="4"
@@ -267,7 +270,8 @@
                             Grid.Column="2"
                             Margin="{StaticResource Margin4}"
                             VerticalAlignment="Center"
-                            Text="{x:Static resx:ResUI.TbValidateDirectExpectedIPsDesc}" />
+                            Text="{x:Static resx:ResUI.TbValidateDirectExpectedIPsDesc}"
+                            TextWrapping="Wrap" />
 
                         <TextBlock
                             Grid.Row="5"
@@ -325,8 +329,7 @@
                             <Button
                                 x:Name="btnImportDefConfig4V2rayCompatible"
                                 Margin="{StaticResource Margin4}"
-                                Content="{x:Static resx:ResUI.TbSettingDnsImportDefConfig}"
-                                Cursor="Hand" />
+                                Content="{x:Static resx:ResUI.TbSettingDnsImportDefConfig}" />
                         </StackPanel>
                     </Grid>
 
@@ -409,8 +412,7 @@
                             <Button
                                 x:Name="btnImportDefConfig4SingboxCompatible"
                                 Margin="{StaticResource Margin4}"
-                                Content="{x:Static resx:ResUI.TbSettingDnsImportDefConfig}"
-                                Cursor="Hand" />
+                                Content="{x:Static resx:ResUI.TbSettingDnsImportDefConfig}" />
                         </StackPanel>
                     </Grid>
 

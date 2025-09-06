@@ -187,6 +187,15 @@ namespace ServiceLib.Resx {
         }
         
         /// <summary>
+        ///   查找类似 Please fill in the correct config template 的本地化字符串。
+        /// </summary>
+        public static string FillCorrectConfigTemplateText {
+            get {
+                return ResourceManager.GetString("FillCorrectConfigTemplateText", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   查找类似 Please fill in the correct custom DNS 的本地化字符串。
         /// </summary>
         public static string FillCorrectDNSText {
@@ -930,6 +939,15 @@ namespace ServiceLib.Resx {
         public static string menuExportConfig {
             get {
                 return ResourceManager.GetString("menuExportConfig", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 Full Config Template Setting 的本地化字符串。
+        /// </summary>
+        public static string menuFullConfigTemplate {
+            get {
+                return ResourceManager.GetString("menuFullConfigTemplate", resourceCulture);
             }
         }
         
@@ -1843,6 +1861,15 @@ namespace ServiceLib.Resx {
         }
         
         /// <summary>
+        ///   查找类似 Start parsing and processing subscription content 的本地化字符串。
+        /// </summary>
+        public static string MsgStartParsingSubscription {
+            get {
+                return ResourceManager.GetString("MsgStartParsingSubscription", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   查找类似 Started updating {0}... 的本地化字符串。
         /// </summary>
         public static string MsgStartUpdating {
@@ -2230,6 +2257,15 @@ namespace ServiceLib.Resx {
         }
         
         /// <summary>
+        ///   查找类似 Do Not Add Non-Proxy Protocol Outbound 的本地化字符串。
+        /// </summary>
+        public static string TbAddProxyProtocolOutboundOnly {
+            get {
+                return ResourceManager.GetString("TbAddProxyProtocolOutboundOnly", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   查找类似 Address 的本地化字符串。
         /// </summary>
         public static string TbAddress {
@@ -2307,6 +2343,15 @@ namespace ServiceLib.Resx {
         public static string TbBlockSVCBHTTPSQueries {
             get {
                 return ResourceManager.GetString("TbBlockSVCBHTTPSQueries", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 Prevent domain-based routing rules from failing 的本地化字符串。
+        /// </summary>
+        public static string TbBlockSVCBHTTPSQueriesTips {
+            get {
+                return ResourceManager.GetString("TbBlockSVCBHTTPSQueriesTips", resourceCulture);
             }
         }
         
@@ -2428,15 +2473,6 @@ namespace ServiceLib.Resx {
         }
         
         /// <summary>
-        ///   查找类似 Domain Matcher 的本地化字符串。
-        /// </summary>
-        public static string TbdomainMatcher {
-            get {
-                return ResourceManager.GetString("TbdomainMatcher", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   查找类似 Domain strategy 的本地化字符串。
         /// </summary>
         public static string TbdomainStrategy {
@@ -2505,6 +2541,24 @@ namespace ServiceLib.Resx {
         public static string TbFlow5 {
             get {
                 return ResourceManager.GetString("TbFlow5", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 This feature is intended for advanced users and those with special requirements. Once enabled, it will ignore the Core&apos;s basic settings, DNS settings, and routing settings. You must ensure that the system proxy port, traffic statistics, and other related configurations are set correctly — everything will be configured by you. 的本地化字符串。
+        /// </summary>
+        public static string TbFullConfigTemplateDesc {
+            get {
+                return ResourceManager.GetString("TbFullConfigTemplateDesc", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 Enable Full Config Template 的本地化字符串。
+        /// </summary>
+        public static string TbFullConfigTemplateEnable {
+            get {
+                return ResourceManager.GetString("TbFullConfigTemplateEnable", resourceCulture);
             }
         }
         
@@ -2689,15 +2743,6 @@ namespace ServiceLib.Resx {
         }
         
         /// <summary>
-        ///   查找类似 Prevent DNS Leaks 的本地化字符串。
-        /// </summary>
-        public static string TbPreventDNSLeaks {
-            get {
-                return ResourceManager.GetString("TbPreventDNSLeaks", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   查找类似 Private Key 的本地化字符串。
         /// </summary>
         public static string TbPrivateKey {
@@ -2721,6 +2766,24 @@ namespace ServiceLib.Resx {
         public static string TbPublicKey {
             get {
                 return ResourceManager.GetString("TbPublicKey", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 v2ray Full Config Template 的本地化字符串。
+        /// </summary>
+        public static string TbRayFullConfigTemplate {
+            get {
+                return ResourceManager.GetString("TbRayFullConfigTemplate", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 Add Outbound Config Only, routing.balancers and routing.rules.outboundTag, Click to view the document 的本地化字符串。
+        /// </summary>
+        public static string TbRayFullConfigTemplateDesc {
+            get {
+                return ResourceManager.GetString("TbRayFullConfigTemplateDesc", resourceCulture);
             }
         }
         
@@ -2883,6 +2946,24 @@ namespace ServiceLib.Resx {
         public static string TbSBFallbackDNSResolve {
             get {
                 return ResourceManager.GetString("TbSBFallbackDNSResolve", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 sing-box Full Config Template 的本地化字符串。
+        /// </summary>
+        public static string TbSBFullConfigTemplate {
+            get {
+                return ResourceManager.GetString("TbSBFullConfigTemplate", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 Add Outbound and Endpoint Config Only, Click to view the document 的本地化字符串。
+        /// </summary>
+        public static string TbSBFullConfigTemplateDesc {
+            get {
+                return ResourceManager.GetString("TbSBFullConfigTemplateDesc", resourceCulture);
             }
         }
         
@@ -3661,11 +3742,47 @@ namespace ServiceLib.Resx {
         }
         
         /// <summary>
+        ///   查找类似 Auto Route 的本地化字符串。
+        /// </summary>
+        public static string TbSettingsTunAutoRoute {
+            get {
+                return ResourceManager.GetString("TbSettingsTunAutoRoute", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   查找类似 Tun Mode settings 的本地化字符串。
         /// </summary>
         public static string TbSettingsTunMode {
             get {
                 return ResourceManager.GetString("TbSettingsTunMode", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 MTU 的本地化字符串。
+        /// </summary>
+        public static string TbSettingsTunMtu {
+            get {
+                return ResourceManager.GetString("TbSettingsTunMtu", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 Stack 的本地化字符串。
+        /// </summary>
+        public static string TbSettingsTunStack {
+            get {
+                return ResourceManager.GetString("TbSettingsTunStack", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 Strict Route 的本地化字符串。
+        /// </summary>
+        public static string TbSettingsTunStrictRoute {
+            get {
+                return ResourceManager.GetString("TbSettingsTunStrictRoute", resourceCulture);
             }
         }
         
@@ -3693,6 +3810,15 @@ namespace ServiceLib.Resx {
         public static string TbSettingsUseSystemHosts {
             get {
                 return ResourceManager.GetString("TbSettingsUseSystemHosts", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 Set Upstream Proxy Tag 的本地化字符串。
+        /// </summary>
+        public static string TbSetUpstreamProxyDetour {
+            get {
+                return ResourceManager.GetString("TbSetUpstreamProxyDetour", resourceCulture);
             }
         }
         

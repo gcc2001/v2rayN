@@ -1,4 +1,5 @@
 using System.Reactive.Disposables;
+using System.Reactive.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -9,10 +10,11 @@ using Avalonia.Threading;
 using DialogHostAvalonia;
 using MsBox.Avalonia.Enums;
 using ReactiveUI;
+using ServiceLib.Manager;
 using Splat;
 using v2rayN.Desktop.Base;
 using v2rayN.Desktop.Common;
-using v2rayN.Desktop.Handler;
+using v2rayN.Desktop.Manager;
 
 namespace v2rayN.Desktop.Views;
 
@@ -28,7 +30,7 @@ public partial class MainWindow : WindowBase<MainWindowViewModel>
     {
         InitializeComponent();
 
-        _config = AppHandler.Instance.Config;
+        _config = AppManager.Instance.Config;
         _manager = new WindowNotificationManager(TopLevel.GetTopLevel(this)) { MaxItems = 3, Position = NotificationPosition.TopRight };
 
         this.KeyDown += MainWindow_KeyDown;
@@ -38,7 +40,6 @@ public partial class MainWindow : WindowBase<MainWindowViewModel>
         menuBackupAndRestore.Click += MenuBackupAndRestore_Click;
         menuClose.Click += MenuClose_Click;
 
-        MessageBus.Current.Listen<string>(EMsgCommand.SendSnackMsg.ToString()).Subscribe(DelegateSnackMsg);
         ViewModel = new MainWindowViewModel(UpdateViewHandler);
         Locator.CurrentMutable.RegisterLazySingleton(() => ViewModel, typeof(MainWindowViewModel));
 
@@ -100,6 +101,7 @@ public partial class MainWindow : WindowBase<MainWindowViewModel>
             this.BindCommand(ViewModel, vm => vm.OptionSettingCmd, v => v.menuOptionSetting).DisposeWith(disposables);
             this.BindCommand(ViewModel, vm => vm.RoutingSettingCmd, v => v.menuRoutingSetting).DisposeWith(disposables);
             this.BindCommand(ViewModel, vm => vm.DNSSettingCmd, v => v.menuDNSSetting).DisposeWith(disposables);
+            this.BindCommand(ViewModel, vm => vm.FullConfigTemplateCmd, v => v.menuFullConfigTemplate).DisposeWith(disposables);
             this.BindCommand(ViewModel, vm => vm.GlobalHotkeySettingCmd, v => v.menuGlobalHotkeySetting).DisposeWith(disposables);
             this.BindCommand(ViewModel, vm => vm.RebootAsAdminCmd, v => v.menuRebootAsAdmin).DisposeWith(disposables);
             this.BindCommand(ViewModel, vm => vm.ClearServerStatisticsCmd, v => v.menuClearServerStatistics).DisposeWith(disposables);
@@ -134,6 +136,24 @@ public partial class MainWindow : WindowBase<MainWindowViewModel>
                     this.Bind(ViewModel, vm => vm.TabMainSelectedIndex, v => v.tabMain2.SelectedIndex).DisposeWith(disposables);
                     break;
             }
+
+            AppEvents.SendSnackMsgRequested
+              .AsObservable()
+              .ObserveOn(RxApp.MainThreadScheduler)
+              .Subscribe(async content => await DelegateSnackMsg(content))
+              .DisposeWith(disposables);
+
+            AppEvents.AppExitRequested
+              .AsObservable()
+              .ObserveOn(RxApp.MainThreadScheduler)
+              .Subscribe(_ => StorageUI())
+              .DisposeWith(disposables);
+
+            AppEvents.ShutdownRequested
+              .AsObservable()
+              .ObserveOn(RxApp.MainThreadScheduler)
+              .Subscribe(content => Shutdown(content))
+              .DisposeWith(disposables);
         });
 
         if (Utils.IsWindows())
@@ -141,7 +161,7 @@ public partial class MainWindow : WindowBase<MainWindowViewModel>
             this.Title = $"{Utils.GetVersion()} - {(Utils.IsAdministrator() ? ResUI.RunAsAdmin : ResUI.NotRunAsAdmin)}";
 
             ThreadPool.RegisterWaitForSingleObject(Program.ProgramStarted, OnProgramStarted, null, -1, false);
-            HotkeyHandler.Instance.Init(_config, OnHotkeyHandler);
+            HotkeyManager.Instance.Init(_config, OnHotkeyHandler);
         }
         else
         {
@@ -154,7 +174,6 @@ public partial class MainWindow : WindowBase<MainWindowViewModel>
         menuAddServerViaScan.IsVisible = false;
 
         AddHelpMenuItem();
-        MessageBus.Current.Listen<string>(EMsgCommand.AppExit.ToString()).Subscribe(StorageUI);
     }
 
     #region Event
@@ -166,11 +185,9 @@ public partial class MainWindow : WindowBase<MainWindowViewModel>
             DispatcherPriority.Default);
     }
 
-    private void DelegateSnackMsg(string content)
+    private async Task DelegateSnackMsg(string content)
     {
-        Dispatcher.UIThread.Post(() =>
-                   _manager?.Show(new Notification(null, content, NotificationType.Information)),
-        DispatcherPriority.Normal);
+        _manager?.Show(new Notification(null, content, NotificationType.Information));
     }
 
     private async Task<bool> UpdateViewHandler(EViewAction action, object? obj)
@@ -190,6 +207,9 @@ public partial class MainWindow : WindowBase<MainWindowViewModel>
             case EViewAction.DNSSettingWindow:
                 return await new DNSSettingWindow().ShowDialog<bool>(this);
 
+            case EViewAction.FullConfigTemplateWindow:
+                return await new FullConfigTemplateWindow().ShowDialog<bool>(this);
+
             case EViewAction.RoutingSettingWindow:
                 return await new RoutingSettingWindow().ShowDialog<bool>(this);
 
@@ -208,33 +228,6 @@ public partial class MainWindow : WindowBase<MainWindowViewModel>
                 DispatcherPriority.Default);
                 break;
 
-            case EViewAction.DispatcherStatistics:
-                if (obj is null)
-                    return false;
-                Dispatcher.UIThread.Post(() =>
-                    ViewModel?.SetStatisticsResult((ServerSpeedItem)obj),
-                DispatcherPriority.Default);
-                break;
-
-            case EViewAction.DispatcherReload:
-                Dispatcher.UIThread.Post(() =>
-                    ViewModel?.ReloadResult(),
-                DispatcherPriority.Default);
-                break;
-
-            case EViewAction.Shutdown:
-                if (obj != null && _blCloseByUser == false)
-                {
-                    _blCloseByUser = (bool)obj;
-                }
-                StorageUI();
-                if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-                {
-                    HotkeyHandler.Instance.Dispose();
-                    desktop.Shutdown();
-                }
-                break;
-
             case EViewAction.ScanScreenTask:
                 await ScanScreenTaskAsync();
                 break;
@@ -249,12 +242,6 @@ public partial class MainWindow : WindowBase<MainWindowViewModel>
                 {
                     await ViewModel.AddServerViaClipboardAsync(clipboardData);
                 }
-                break;
-
-            case EViewAction.AdjustMainLvColWidth:
-                Dispatcher.UIThread.Post(() =>
-                   Locator.Current.GetService<ProfilesViewModel>()?.AutofitColumnWidthAsync(),
-                    DispatcherPriority.Default);
                 break;
         }
 
@@ -295,10 +282,7 @@ public partial class MainWindow : WindowBase<MainWindowViewModel>
                 break;
 
             case WindowCloseReason.ApplicationShutdown or WindowCloseReason.OSShutdown:
-                if (ViewModel != null)
-                {
-                    await ViewModel.MyAppExitAsync(true);
-                }
+                await AppManager.Instance.AppExitAsync(false);
                 break;
         }
 
@@ -347,7 +331,7 @@ public partial class MainWindow : WindowBase<MainWindowViewModel>
     {
         //ShowHideWindow(false);
 
-        NoticeHandler.Instance.SendMessageAndEnqueue("Not yet implemented.(还未实现)");
+        NoticeManager.Instance.SendMessageAndEnqueue("Not yet implemented.(还未实现)");
         await Task.CompletedTask;
         //if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         //{
@@ -393,9 +377,21 @@ public partial class MainWindow : WindowBase<MainWindowViewModel>
 
         _blCloseByUser = true;
         StorageUI();
-        if (ViewModel != null)
+
+        await AppManager.Instance.AppExitAsync(true);
+    }
+
+    private void Shutdown(bool obj)
+    {
+        if (obj is bool b && _blCloseByUser == false)
         {
-            await ViewModel.MyAppExitAsync(false);
+            _blCloseByUser = b;
+        }
+        StorageUI();
+        if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            HotkeyManager.Instance.Dispose();
+            desktop.Shutdown();
         }
     }
 
@@ -457,7 +453,7 @@ public partial class MainWindow : WindowBase<MainWindowViewModel>
         }
     }
 
-    private void StorageUI(string? n = null)
+    private void StorageUI()
     {
         ConfigHandler.SaveWindowSizeItem(_config, GetType().Name, Width, Height);
 
@@ -473,7 +469,7 @@ public partial class MainWindow : WindowBase<MainWindowViewModel>
 
     private void AddHelpMenuItem()
     {
-        var coreInfo = CoreInfoHandler.Instance.GetCoreInfo();
+        var coreInfo = CoreInfoManager.Instance.GetCoreInfo();
         foreach (var it in coreInfo
             .Where(t => t.CoreType != ECoreType.v2fly
                         && t.CoreType != ECoreType.hysteria))
