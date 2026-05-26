@@ -1,0 +1,569 @@
+name: Build v2rayN Windows 32 SelfContained
+
+on:
+  schedule:
+    # 每天 18:30 UTC 运行一次；北京时间约为次日 02:30
+    - cron: "11 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-v2rayn-windows-32-selfcontained
+  cancel-in-progress: false
+
+env:
+  V2RAYN_REPO_DIR: v2rayn-src
+  CORE_BIN_REPO_DIR: core-bin
+
+  PROJECT_FILE: v2rayn-src/v2rayN/v2rayN/v2rayN.csproj
+
+  DIST_ROOT: dist
+  PACKAGE_NAME: v2rayN-windows-32-SelfContained
+  PACKAGE_DIR: dist/v2rayN-windows-32-SelfContained
+  ZIP_NAME: v2rayN-windows-32-SelfContained.zip
+
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  precheck:
+    name: Check whether release asset already exists
+    runs-on: windows-latest
+
+    outputs:
+      should_build: ${{ steps.decide.outputs.should_build }}
+      v2rayn_version: ${{ steps.decide.outputs.v2rayn_version }}
+      v2rayn_ref: ${{ steps.decide.outputs.v2rayn_ref }}
+
+    steps:
+      - name: Decide whether to build
+        id: decide
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          ZIP_NAME: v2rayN-windows-32-SelfContained.zip
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          function Invoke-GitHubApi {
+            param(
+              [Parameter(Mandatory = $true)]
+              [string]$Uri
+            )
+
+            $headers = @{
+              "Accept" = "application/vnd.github+json"
+              "X-GitHub-Api-Version" = "2022-11-28"
+            }
+
+            if ($env:GITHUB_TOKEN) {
+              $headers["Authorization"] = "Bearer $env:GITHUB_TOKEN"
+            }
+
+            return Invoke-RestMethod -Uri $Uri -Headers $headers
+          }
+
+          # 1. 获取 v2rayN 最新正式 Release。
+          # releases/latest 返回最新正式版，不取 prerelease / draft。
+          $v2raynRelease = Invoke-GitHubApi `
+            -Uri "https://api.github.com/repos/2dust/v2rayN/releases/latest"
+
+          $v2raynRef = [string]$v2raynRelease.tag_name
+          $v2raynVersion = $v2raynRef -replace '^v', ''
+
+          if (-not $v2raynRef) {
+            throw "Cannot determine latest v2rayN release tag."
+          }
+
+          Write-Host "Latest v2rayN stable release tag: $v2raynRef"
+          Write-Host "Release version used locally: $v2raynVersion"
+
+          # 2. 检查当前仓库是否已经有同版本 Release，以及是否已有固定 ZIP。
+          $releaseExists = $false
+          $assetExists = $false
+
+          $encodedTag = [System.Uri]::EscapeDataString($v2raynVersion)
+          $releaseUri = "https://api.github.com/repos/$env:GH_REPO/releases/tags/$encodedTag"
+
+          try {
+            $currentRelease = Invoke-GitHubApi -Uri $releaseUri
+            $releaseExists = $true
+
+            $assetExists = @(
+              $currentRelease.assets |
+                Where-Object { $_.name -eq $env:ZIP_NAME }
+            ).Count -gt 0
+          }
+          catch {
+            $statusCode = $null
+
+            if ($_.Exception.Response) {
+              $statusCode = [int]$_.Exception.Response.StatusCode
+            }
+
+            if ($statusCode -eq 404) {
+              Write-Host "Release $v2raynVersion does not exist in $env:GH_REPO."
+              $releaseExists = $false
+              $assetExists = $false
+            }
+            else {
+              throw
+            }
+          }
+
+          # 3. 只判断：对应版本 Release 是否存在 + 固定 ZIP 是否存在。
+          if ($releaseExists -and $assetExists) {
+            $shouldBuild = "false"
+            Write-Host "Release $v2raynVersion already contains $env:ZIP_NAME. Build will be skipped."
+          }
+          else {
+            $shouldBuild = "true"
+            Write-Host "Build is needed."
+            Write-Host "releaseExists=$releaseExists"
+            Write-Host "assetExists=$assetExists"
+          }
+
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "should_build=$shouldBuild"
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "v2rayn_version=$v2raynVersion"
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "v2rayn_ref=$v2raynRef"
+
+  build:
+    name: Build and release
+    runs-on: windows-latest
+    needs: precheck
+    if: needs.precheck.outputs.should_build == 'true'
+
+    steps:
+      - name: Set release variables
+        shell: pwsh
+        run: |
+          Add-Content -Path $env:GITHUB_ENV -Value "V2RAYN_VERSION=${{ needs.precheck.outputs.v2rayn_version }}"
+          Add-Content -Path $env:GITHUB_ENV -Value "RELEASE_TAG=${{ needs.precheck.outputs.v2rayn_version }}"
+          Add-Content -Path $env:GITHUB_ENV -Value "V2RAYN_REF=${{ needs.precheck.outputs.v2rayn_ref }}"
+
+      - name: Checkout v2rayN source
+        uses: actions/checkout@v4
+        with:
+          repository: 2dust/v2rayN
+          ref: ${{ needs.precheck.outputs.v2rayn_ref }}
+          path: ${{ env.V2RAYN_REPO_DIR }}
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Verify GlobalHotKeys submodule
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          git -C "${{ env.V2RAYN_REPO_DIR }}" submodule status --recursive
+
+          $globalHotKeysPath = "${{ env.V2RAYN_REPO_DIR }}\v2rayN\GlobalHotKeys"
+
+          if (-not (Test-Path $globalHotKeysPath)) {
+            throw "GlobalHotKeys submodule was not checked out: $globalHotKeysPath"
+          }
+
+      - name: Checkout v2rayN core-bin baseline files
+        uses: actions/checkout@v4
+        with:
+          repository: 2dust/v2rayN-core-bin
+          ref: master
+          path: ${{ env.CORE_BIN_REPO_DIR }}
+          fetch-depth: 1
+          lfs: true
+          sparse-checkout: |
+            v2rayN-windows-64/bin
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Show .NET info
+        shell: pwsh
+        run: |
+          dotnet --info
+
+      - name: Restore
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          dotnet restore "${{ env.PROJECT_FILE }}" -r win-x86
+
+      - name: Publish v2rayN win-x86 self-contained
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          if (Test-Path "${{ env.DIST_ROOT }}") {
+            Remove-Item "${{ env.DIST_ROOT }}" -Recurse -Force
+          }
+
+          New-Item -ItemType Directory -Force -Path "${{ env.PACKAGE_DIR }}" | Out-Null
+
+          dotnet publish "${{ env.PROJECT_FILE }}" `
+            -c Release `
+            -r win-x86 `
+            --self-contained true `
+            -p:PlatformTarget=x86 `
+            -p:SelfContained=true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true `
+            -p:PublishReadyToRun=false `
+            -o "${{ env.PACKAGE_DIR }}"
+
+      - name: Copy v2rayN core-bin baseline files
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $sourceBin = "${{ env.CORE_BIN_REPO_DIR }}\v2rayN-windows-64\bin"
+          $targetBin = "${{ env.PACKAGE_DIR }}\bin"
+
+          if (-not (Test-Path $sourceBin)) {
+            throw "Cannot find source bin directory: $sourceBin"
+          }
+
+          New-Item -ItemType Directory -Force -Path $targetBin | Out-Null
+
+          Copy-Item `
+            -Path "$sourceBin\*" `
+            -Destination $targetBin `
+            -Recurse `
+            -Force
+
+          New-Item -ItemType Directory -Force -Path "$targetBin\xray" | Out-Null
+          New-Item -ItemType Directory -Force -Path "$targetBin\sing_box" | Out-Null
+
+      - name: Download latest stable 32-bit Xray and sing-box
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          function Invoke-GitHubApi {
+            param(
+              [Parameter(Mandatory = $true)]
+              [string]$Uri
+            )
+
+            $headers = @{
+              "Accept" = "application/vnd.github+json"
+              "X-GitHub-Api-Version" = "2022-11-28"
+            }
+
+            if ($env:GITHUB_TOKEN) {
+              $headers["Authorization"] = "Bearer $env:GITHUB_TOKEN"
+            }
+
+            return Invoke-RestMethod -Uri $Uri -Headers $headers
+          }
+
+          function Get-LatestStableRelease {
+            param(
+              [Parameter(Mandatory = $true)]
+              [string]$Repo
+            )
+
+            return Invoke-GitHubApi `
+              -Uri "https://api.github.com/repos/$Repo/releases/latest"
+          }
+
+          function Get-ReleaseAsset {
+            param(
+              [Parameter(Mandatory = $true)]
+              $Release,
+
+              [Parameter(Mandatory = $true)]
+              [string]$Regex,
+
+              [Parameter(Mandatory = $true)]
+              [string]$Name
+            )
+
+            $asset = $Release.assets |
+              Where-Object { $_.name -match $Regex } |
+              Select-Object -First 1
+
+            if (-not $asset) {
+              Write-Host "Assets available in $Name release:"
+              $Release.assets | ForEach-Object { Write-Host " - $($_.name)" }
+              throw "Cannot find asset for $Name by regex: $Regex"
+            }
+
+            return $asset
+          }
+
+          function Download-And-Extract-Zip {
+            param(
+              [Parameter(Mandatory = $true)]
+              [string]$Url,
+
+              [Parameter(Mandatory = $true)]
+              [string]$ZipPath,
+
+              [Parameter(Mandatory = $true)]
+              [string]$ExtractDir
+            )
+
+            New-Item -ItemType Directory -Force -Path $ExtractDir | Out-Null
+            Invoke-WebRequest -Uri $Url -OutFile $ZipPath
+            Expand-Archive -Path $ZipPath -DestinationPath $ExtractDir -Force
+          }
+
+          $workDir = "core-downloads"
+          $xrayDir = Join-Path $workDir "xray"
+          $singBoxDir = Join-Path $workDir "sing-box"
+          $binDir = "${{ env.PACKAGE_DIR }}\bin"
+
+          New-Item -ItemType Directory -Force -Path $workDir | Out-Null
+          New-Item -ItemType Directory -Force -Path "$binDir\xray" | Out-Null
+          New-Item -ItemType Directory -Force -Path "$binDir\sing_box" | Out-Null
+
+          # releases/latest 返回最新正式版，不取 prerelease / draft。
+          $xrayRelease = Get-LatestStableRelease -Repo "XTLS/Xray-core"
+          $singBoxRelease = Get-LatestStableRelease -Repo "SagerNet/sing-box"
+
+          Write-Host "Xray latest stable tag: $($xrayRelease.tag_name)"
+          Write-Host "sing-box latest stable tag: $($singBoxRelease.tag_name)"
+
+          $xrayAsset = Get-ReleaseAsset `
+            -Release $xrayRelease `
+            -Regex '^Xray-windows-32\.zip$' `
+            -Name "Xray-core"
+
+          $singBoxAsset = Get-ReleaseAsset `
+            -Release $singBoxRelease `
+            -Regex '^sing-box-.*-windows-386\.zip$' `
+            -Name "sing-box"
+
+          Download-And-Extract-Zip `
+            -Url $xrayAsset.browser_download_url `
+            -ZipPath (Join-Path $workDir $xrayAsset.name) `
+            -ExtractDir $xrayDir
+
+          Download-And-Extract-Zip `
+            -Url $singBoxAsset.browser_download_url `
+            -ZipPath (Join-Path $workDir $singBoxAsset.name) `
+            -ExtractDir $singBoxDir
+
+          $xrayExe = Get-ChildItem -Path $xrayDir -Recurse -Filter "xray.exe" -File |
+            Select-Object -First 1
+
+          $singBoxExe = Get-ChildItem -Path $singBoxDir -Recurse -Filter "sing-box.exe" -File |
+            Select-Object -First 1
+
+          if (-not $xrayExe) {
+            throw "xray.exe not found after extracting $($xrayAsset.name)"
+          }
+
+          if (-not $singBoxExe) {
+            throw "sing-box.exe not found after extracting $($singBoxAsset.name)"
+          }
+
+          # 覆盖 baseline bin 中可能已有的 64 位核心。
+          Copy-Item $xrayExe.FullName -Destination "$binDir\xray\xray.exe" -Force
+          Copy-Item $singBoxExe.FullName -Destination "$binDir\sing_box\sing-box.exe" -Force
+
+          # 下载包中的 *.dat 统一放到 bin 根目录。
+          Get-ChildItem -Path $xrayDir, $singBoxDir -Recurse -Filter "*.dat" -File -ErrorAction SilentlyContinue |
+            ForEach-Object {
+              Copy-Item $_.FullName -Destination "$binDir\$($_.Name)" -Force
+            }
+
+          # baseline 的 xray / sing_box 子目录内如果存在 *.dat，也统一搬到 bin 根目录。
+          foreach ($coreSubDir in @("$binDir\xray", "$binDir\sing_box")) {
+            if (Test-Path $coreSubDir) {
+              Get-ChildItem -Path $coreSubDir -Recurse -Filter "*.dat" -File -ErrorAction SilentlyContinue |
+                ForEach-Object {
+                  Copy-Item $_.FullName -Destination "$binDir\$($_.Name)" -Force
+                  Remove-Item $_.FullName -Force
+                }
+            }
+          }
+
+          Add-Content -Path $env:GITHUB_ENV -Value "XRAY_TAG=$($xrayRelease.tag_name)"
+          Add-Content -Path $env:GITHUB_ENV -Value "SING_BOX_TAG=$($singBoxRelease.tag_name)"
+
+      - name: Capture .NET runtime version
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $runtimeName = "Microsoft.WindowsDesktop.App.Runtime.win-x86"
+          $runtimeVersion = $null
+
+          $depsFile = Get-ChildItem -Path "${{ env.PACKAGE_DIR }}" -Filter "*.deps.json" -File -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+
+          if ($depsFile) {
+            $depsText = Get-Content $depsFile.FullName -Raw
+
+            $patterns = @(
+              '"Microsoft\.WindowsDesktop\.App\.Runtime\.win-x86/([^"]+)"',
+              '"Microsoft\.NETCore\.App\.Runtime\.win-x86/([^"]+)"',
+              '"Microsoft\.WindowsDesktop\.App/([^"]+)"',
+              '"Microsoft\.NETCore\.App/([^"]+)"'
+            )
+
+            foreach ($pattern in $patterns) {
+              $match = [regex]::Match($depsText, $pattern)
+              if ($match.Success) {
+                $runtimeVersion = $match.Groups[1].Value
+                break
+              }
+            }
+          }
+
+          if (-not $runtimeVersion) {
+            $runtimeLine = dotnet --list-runtimes |
+              Where-Object { $_ -match '^Microsoft\.WindowsDesktop\.App\s+10\.' } |
+              Select-Object -Last 1
+
+            if ($runtimeLine -match '^Microsoft\.WindowsDesktop\.App\s+([^\s]+)') {
+              $runtimeName = "Microsoft.WindowsDesktop.App"
+              $runtimeVersion = $Matches[1]
+            }
+          }
+
+          if (-not $runtimeVersion) {
+            $runtimeVersion = "unknown"
+          }
+
+          $displayRuntime = "$runtimeName $runtimeVersion"
+
+          Add-Content -Path $env:GITHUB_ENV -Value "DOTNET_RUNTIME_VERSION=$displayRuntime"
+
+          Write-Host ".NET runtime: $displayRuntime"
+
+      - name: Validate package layout
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $packageDir = "${{ env.PACKAGE_DIR }}"
+          $binDir = "$packageDir\bin"
+
+          $requiredPaths = @(
+            $packageDir,
+            $binDir,
+            "$binDir\xray\xray.exe",
+            "$binDir\sing_box\sing-box.exe",
+            "$binDir\EnableLoopback.exe",
+            "$binDir\geoip.dat",
+            "$binDir\geosite.dat"
+          )
+
+          foreach ($path in $requiredPaths) {
+            if (-not (Test-Path $path)) {
+              throw "Required path missing: $path"
+            }
+          }
+
+          $datFilesInCoreDirs = @()
+
+          foreach ($coreSubDir in @("$binDir\xray", "$binDir\sing_box")) {
+            if (Test-Path $coreSubDir) {
+              $datFilesInCoreDirs += Get-ChildItem -Path $coreSubDir -Recurse -Filter "*.dat" -File -ErrorAction SilentlyContinue
+            }
+          }
+
+          if ($datFilesInCoreDirs.Count -gt 0) {
+            $datFilesInCoreDirs | ForEach-Object { Write-Host "Unexpected dat file: $($_.FullName)" }
+            throw "*.dat files should be placed in bin root, not in xray/sing_box subdirectories."
+          }
+
+          if (Test-Path "$packageDir\core_versions.txt") {
+            throw "core_versions.txt should not be included in package."
+          }
+
+      - name: Create zip package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          if (Test-Path "${{ env.ZIP_NAME }}") {
+            Remove-Item "${{ env.ZIP_NAME }}" -Force
+          }
+
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+          # 压缩 dist 目录，确保 ZIP 内部顶层目录是 v2rayN-windows-32-SelfContained/
+          [System.IO.Compression.ZipFile]::CreateFromDirectory(
+            (Resolve-Path "${{ env.DIST_ROOT }}"),
+            (Join-Path (Get-Location) "${{ env.ZIP_NAME }}"),
+            [System.IO.Compression.CompressionLevel]::Optimal,
+            $false
+          )
+
+          $zip = [System.IO.Compression.ZipFile]::OpenRead((Join-Path (Get-Location) "${{ env.ZIP_NAME }}"))
+
+          try {
+            $hasPackageRoot = $zip.Entries |
+              Where-Object { $_.FullName -like "${{ env.PACKAGE_NAME }}/*" } |
+              Select-Object -First 1
+
+            if (-not $hasPackageRoot) {
+              throw "ZIP does not contain top-level folder ${{ env.PACKAGE_NAME }}/"
+            }
+          }
+          finally {
+            $zip.Dispose()
+          }
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: v2rayN-windows-32-SelfContained
+          path: ${{ env.ZIP_NAME }}
+          if-no-files-found: error
+
+      - name: Create or update GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $tag = $env:RELEASE_TAG
+          $title = $env:V2RAYN_VERSION
+          $asset = "${{ env.ZIP_NAME }}"
+
+          $notes = @"
+          Xray-core: $env:XRAY_TAG
+          sing-box: $env:SING_BOX_TAG
+          .NET runtime: $env:DOTNET_RUNTIME_VERSION
+          Package: $asset
+          "@
+
+          $releaseJson = gh release view "$tag" `
+            --repo "$env:GH_REPO" `
+            --json tagName,name,assets 2>$null
+
+          if ($LASTEXITCODE -eq 0 -and $releaseJson) {
+            Write-Host "Release $tag already exists. Updating title/body and replacing asset."
+
+            gh release edit "$tag" `
+              --repo "$env:GH_REPO" `
+              --title "$title" `
+              --notes "$notes"
+
+            gh release upload "$tag" "$asset" `
+              --repo "$env:GH_REPO" `
+              --clobber
+          }
+          else {
+            Write-Host "Creating release $tag."
+
+            gh release create "$tag" "$asset" `
+              --repo "$env:GH_REPO" `
+              --title "$title" `
+              --notes "$notes"
+          }
